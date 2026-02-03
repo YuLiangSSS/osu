@@ -19,7 +19,6 @@ using osu.Game.Database;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
-using osu.Game.Input.Bindings;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
@@ -47,6 +46,7 @@ namespace osu.Game.Screens.SelectV2
         private ShearedDropdown<SortMode> sortDropdown = null!;
         private ShearedDropdown<GroupMode> groupDropdown = null!;
         private CollectionDropdown collectionDropdown = null!;
+        private CircleSizeSelector csSelector = null!;
 
         [Resolved]
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;
@@ -115,7 +115,6 @@ namespace osu.Game.Screens.SelectV2
                             {
                                 RelativeSizeAxes = Axes.X,
                                 HoldFocus = true,
-                                ScopedBeatmapSet = ScopedBeatmapSet,
                             },
                         },
                         new GridContainer
@@ -191,7 +190,12 @@ namespace osu.Game.Screens.SelectV2
                         new ScopedBeatmapSetDisplay
                         {
                             ScopedBeatmapSet = ScopedBeatmapSet,
-                        }
+                            Depth = float.MinValue, // hack to ensure that the scoped display handles `GlobalAction.Back` input before the filter control
+                        },
+                        csSelector = new CircleSizeSelector
+                        {
+                            RelativeSizeAxes = Axes.X,
+                        },
                     },
                 }
             };
@@ -252,6 +256,9 @@ namespace osu.Game.Screens.SelectV2
             localUserFavouriteBeatmapSets.BindCollectionChanged((_, _) => updateCriteria());
             ScopedBeatmapSet.BindValueChanged(_ => updateCriteria(clearScopedSet: false));
 
+            csSelector.Current.BindValueChanged(_ => updateCriteria());
+            csSelector.CircleSizeFilter.SelectionChanged += updateCriteria;
+
             updateCriteria();
         }
 
@@ -288,10 +295,42 @@ namespace osu.Game.Screens.SelectV2
             if (!difficultyRangeSlider.UpperBound.IsDefault)
                 criteria.UserStarDifficulty.Max = difficultyRangeSlider.UpperBound.Value;
 
+            applyCircleSizeFilter(criteria);
+
             criteria.RulesetCriteria = ruleset.Value.CreateInstance().CreateRulesetFilterCriteria();
 
             FilterQueryParser.ApplyQueries(criteria, query);
             return criteria;
+        }
+
+        private void applyCircleSizeFilter(FilterCriteria criteria)
+        {
+            var selectedModeIds = csSelector.CircleSizeFilter.SelectedModeID;
+
+            if (selectedModeIds.Count == 0 || selectedModeIds.Contains("All"))
+                return;
+
+            var selectedModes = CircleSizeItemID.ALL
+                                         .Where(m => selectedModeIds.Contains(m.Id) && m.CsValue.HasValue)
+                                         .Select(m => m.CsValue!.Value)
+                                         .ToList();
+
+            if (selectedModes.Count == 0)
+                return;
+
+            criteria.DiscreteCircleSizeValues = new List<float>(selectedModes);
+
+            if (ruleset.Value.OnlineID != 3)
+            {
+                // For no mania rulesets, ��0.5 is an intuitive range.
+                criteria.CircleSize = new FilterCriteria.OptionalRange<float>
+                {
+                    Min = selectedModes.Min() - 0.5f,
+                    Max = selectedModes.Max() + 0.5f,
+                    IsLowerInclusive = false,
+                    IsUpperInclusive = false
+                };
+            }
         }
 
         private void updateCriteria(bool clearScopedSet = true)
@@ -331,38 +370,11 @@ namespace osu.Game.Screens.SelectV2
 
         internal partial class SongSelectSearchTextBox : ShearedFilterTextBox
         {
-            public Bindable<BeatmapSetInfo?> ScopedBeatmapSet
-            {
-                get => scopedBeatmapSet.Current;
-                set => scopedBeatmapSet.Current = value;
-            }
-
-            private readonly BindableWithCurrent<BeatmapSetInfo?> scopedBeatmapSet = new BindableWithCurrent<BeatmapSetInfo?>();
-
-            protected override InnerSearchTextBox CreateInnerTextBox() => new InnerTextBox
-            {
-                ScopedBeatmapSet = ScopedBeatmapSet,
-            };
+            protected override InnerSearchTextBox CreateInnerTextBox() => new InnerTextBox();
 
             private partial class InnerTextBox : InnerFilterTextBox
             {
-                public Bindable<BeatmapSetInfo?> ScopedBeatmapSet
-                {
-                    get => scopedBeatmapSet.Current;
-                    set => scopedBeatmapSet.Current = value;
-                }
-
-                private readonly BindableWithCurrent<BeatmapSetInfo?> scopedBeatmapSet = new BindableWithCurrent<BeatmapSetInfo?>();
-
                 public override bool HandleLeftRightArrows => false;
-
-                public override bool OnPressed(KeyBindingPressEvent<GlobalAction> e)
-                {
-                    if (e.Action == GlobalAction.Back && scopedBeatmapSet.Value != null)
-                        return false;
-
-                    return base.OnPressed(e);
-                }
 
                 public override bool OnPressed(KeyBindingPressEvent<PlatformAction> e)
                 {

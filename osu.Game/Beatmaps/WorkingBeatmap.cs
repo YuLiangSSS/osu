@@ -34,6 +34,8 @@ namespace osu.Game.Beatmaps
 
         public Storyboard Storyboard => storyboard.Value;
 
+        public IBeatmap BeatmapAfterConverted;
+
         public ISkin Skin => skin.Value;
 
         private AudioManager audioManager { get; }
@@ -343,6 +345,12 @@ namespace osu.Game.Beatmaps
             {
                 token.ThrowIfCancellationRequested();
                 mod.ApplyToBeatmap(converted);
+            }
+
+            foreach (var mod in mods.OfType<IApplicableBeatmapAfterAll>())
+            {
+                token.ThrowIfCancellationRequested();
+                mod.ApplyToFinalBeatmap(converted, mods, rulesetInstance);
             }
 
             return converted;

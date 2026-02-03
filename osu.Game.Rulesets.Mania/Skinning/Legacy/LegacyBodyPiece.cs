@@ -11,6 +11,7 @@ using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Testing;
+using osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.UI.Scrolling;
@@ -200,9 +201,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
                 // transforms not applied to entire hold note in order to not affect hit lighting
                 const double fade_duration = 60;
 
-                holdNote.Head.FadeColour(Colour4.DarkGray, fade_duration);
-                holdNote.Tail.FadeColour(Colour4.DarkGray, fade_duration);
-                bodySprite?.FadeColour(Colour4.DarkGray, fade_duration);
+                if (!ManiaModO2Judgement.IsActivated)
+                {
+                    holdNote.Head.FadeColour(Colour4.DarkGray, fade_duration);
+                    holdNote.Tail.FadeColour(Colour4.DarkGray, fade_duration);
+                    bodySprite?.FadeColour(Colour4.DarkGray, fade_duration);
+                }
             }
         }
 

@@ -17,7 +17,7 @@ namespace osu.Game.Graphics.Containers
 {
     public partial class ParallaxContainer : Container, IRequireHighFrequencyMousePosition
     {
-        public const float DEFAULT_PARALLAX_AMOUNT = 0.02f;
+        public const float DEFAULT_PARALLAX_AMOUNT = 0.50f; // 0.02f
 
         /// <summary>
         /// The amount of parallax movement. Negative values will reverse the direction of parallax relative to user input.
@@ -55,7 +55,7 @@ namespace osu.Game.Graphics.Containers
                 if (!parallaxEnabled.Value)
                 {
                     content.MoveTo(Vector2.Zero, firstUpdate ? 0 : 1000, Easing.OutQuint);
-                    content.Scale = new Vector2(1 + Math.Abs(ParallaxAmount));
+                    content.Scale = new Vector2(1 + Math.Abs(ParallaxAmount / 5));
                 }
             };
         }
@@ -91,7 +91,7 @@ namespace osu.Game.Graphics.Containers
                 double elapsed = Math.Clamp(Clock.ElapsedFrameTime, 0, parallax_duration);
 
                 content.Position = Interpolation.ValueAt(elapsed, content.Position, offset, 0, parallax_duration, Easing.OutQuint);
-                content.Scale = Interpolation.ValueAt(elapsed, content.Scale, new Vector2(1 + Math.Abs(ParallaxAmount)), 0, 1000, Easing.OutQuint);
+                content.Scale = Interpolation.ValueAt(elapsed, content.Scale, new Vector2(1 + Math.Abs(ParallaxAmount / 5)), 0, 1000, Easing.OutQuint);
             }
 
             firstUpdate = false;

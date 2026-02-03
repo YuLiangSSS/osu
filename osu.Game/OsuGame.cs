@@ -1585,20 +1585,6 @@ namespace osu.Game
 
                     SkinManager.SelectRandomSkin();
                     return true;
-
-                case GlobalAction.NextSkin:
-                    if (skinEditor.State.Value == Visibility.Visible)
-                        return false;
-
-                    SkinManager.SelectNextSkin();
-                    return true;
-
-                case GlobalAction.PreviousSkin:
-                    if (skinEditor.State.Value == Visibility.Visible)
-                        return false;
-
-                    SkinManager.SelectPreviousSkin();
-                    return true;
             }
 
             return false;
@@ -1709,11 +1695,17 @@ namespace osu.Game
                 case IntroScreen intro:
                     introScreen = intro;
                     devBuildBanner?.Show();
+
+                    // For seeking background clearly.
+                    devBuildBanner?.Hide();
                     break;
 
                 case MainMenu menu:
                     menuScreen = menu;
                     devBuildBanner?.Show();
+
+                    // For seeking background clearly.
+                    devBuildBanner?.Hide();
                     break;
 
                 case Player player:

@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Framework.Extensions.IEnumerableExtensions;
 using osu.Game.Beatmaps;
 using osu.Game.Extensions;
 using osu.Game.Rulesets.Difficulty;
@@ -14,6 +15,7 @@ using osu.Game.Rulesets.Mania.Difficulty.Preprocessing;
 using osu.Game.Rulesets.Mania.Difficulty.Skills;
 using osu.Game.Rulesets.Mania.MathUtils;
 using osu.Game.Rulesets.Mania.Mods;
+using osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mods;
@@ -27,6 +29,7 @@ namespace osu.Game.Rulesets.Mania.Difficulty
         private const double difficulty_multiplier = 0.018;
 
         private readonly bool isForCurrentRuleset;
+        private readonly double originalOverallDifficulty;
 
         public override int Version => 20241007;
 
@@ -34,6 +37,7 @@ namespace osu.Game.Rulesets.Mania.Difficulty
             : base(ruleset, beatmap)
         {
             isForCurrentRuleset = beatmap.BeatmapInfo.Ruleset.MatchesOnlineID(ruleset);
+            originalOverallDifficulty = beatmap.BeatmapInfo.Difficulty.OverallDifficulty;
         }
 
         protected override DifficultyAttributes CreateDifficultyAttributes(IBeatmap beatmap, Mod[] mods, Skill[] skills, double clockRate)
@@ -44,14 +48,164 @@ namespace osu.Game.Rulesets.Mania.Difficulty
             HitWindows hitWindows = new ManiaHitWindows();
             hitWindows.SetDifficulty(beatmap.Difficulty.OverallDifficulty);
 
+            double SR = skills[0].DifficultyValue() * difficulty_multiplier;
+            //try
+            //{
+            SR = AdditionalMethod(beatmap, mods, skills, clockRate, SR);
+            //}
+            //catch
+            //{
+            //    SR = skills[0].DifficultyValue() * difficulty_multiplier;
+            //}
             ManiaDifficultyAttributes attributes = new ManiaDifficultyAttributes
             {
-                StarRating = skills.OfType<Strain>().Single().DifficultyValue() * difficulty_multiplier,
+                StarRating = SR,
                 Mods = mods,
                 MaxCombo = beatmap.HitObjects.Sum(maxComboForObject),
             };
 
             return attributes;
+        }
+
+        public double AdditionalMethod(IBeatmap beatmap, Mod[] mods, Skill[] skills, double clockRate, double originalValue)
+        {
+            double SR = originalValue;
+            if (mods.Any(m => m is StarRatingRebirth))
+            {
+                DateTime beforeCal = DateTime.Now;
+                ManiaBeatmap maniaBeatmap = (ManiaBeatmap)beatmap;
+                int keys = (int)maniaBeatmap.Difficulty.CircleSize;
+                double od = maniaBeatmap.Difficulty.OverallDifficulty;
+                int cs = (int)maniaBeatmap.Difficulty.CircleSize;
+                var hit = maniaBeatmap.HitObjects.ToList();
+                keys = maniaBeatmap.TotalColumns;
+
+                ManiaModNtoM? ntmMod = null;
+                ManiaModNtoMAnother? ntmaMod = null;
+                ManiaModDoublePlay? dpMod = null;
+                ManiaModAdjust? adjustMod = null;
+                StarRatingRebirth? starRatingRebirth = null;
+
+                foreach (var mod in mods)
+                {
+                    if (mod.GetType() == typeof(ManiaModNtoM))
+                    {
+                        ntmMod = (ManiaModNtoM)mod;
+                    }
+                    if (mod.GetType() == typeof(ManiaModNtoMAnother))
+                    {
+                        ntmaMod = (ManiaModNtoMAnother)mod;
+                    }
+                    if (mod.GetType() == typeof(ManiaModDoublePlay))
+                    {
+                        dpMod = (ManiaModDoublePlay)mod;
+                    }
+                    if (mod.GetType() == typeof(StarRatingRebirth))
+                    {
+                        starRatingRebirth = (StarRatingRebirth)mod;
+                    }
+                    if (mod.GetType() == typeof(ManiaModAdjust))
+                    {
+                        adjustMod = (ManiaModAdjust)mod;
+                    }
+                }
+                if (mods.Any(m => m is StarRatingRebirth) && cs < keys)
+                {
+                    if (ntmMod is not null)
+                    {
+                        hit = StarRatingRebirth.NTM(hit, keys, cs)!;
+                    }
+                    /*if (ntma && ntmamod is not null)
+                    {
+                        hit = StarRatingRebirth.NTMA(beatmap, ntmamod.BlankColumn.Value, keys, ntmamod.Gap.Value, ntmamod.CleanDivide.Value)!;
+                    }
+                    if (dpmod is not null && cs == 4)
+                    {
+                        hit = StarRatingRebirth.DP(hit, dpmod.Style.Value);
+                    }*/
+                    // IDK why NtoM is not working (cannot get the correct HitObjects), but NtoMAnother and DP is working fine.
+                }
+
+                try
+                {
+                    if (starRatingRebirth is not null && keys <= 10 && mods.Any(m => m is StarRatingRebirth)/* && !hasNull*/)
+                    {
+                        if (starRatingRebirth.Original.Value)
+                        {
+                            if (adjustMod is not null)
+                            {
+                                //if (adjustMod.UseBPM.Value)
+                                //{
+                                //    if (beatmap.BeatmapInfo.BPM == Beatmap.BeatmapInfo.BPM)
+                                //    {
+                                //        SR = StarRatingRebirth.CalculateStarRating(hit, Beatmap.BeatmapInfo.Difficulty.OverallDifficulty, keys, adjustMod.SpeedChange.Value);
+                                //    }
+                                //    else
+                                //    {
+                                //        SR = originalValue;
+                                //    }
+                                //}
+                                //else
+                                {
+                                    SR = StarRatingRebirth.CalculateStarRating(hit, Beatmap.BeatmapInfo.Difficulty.OverallDifficulty, keys, adjustMod.SpeedChange.Value);
+                                }
+                            }
+                            else
+                            {
+                                SR = StarRatingRebirth.CalculateStarRating(hit, od, keys, clockRate);
+                            }
+                        }
+                        else if (starRatingRebirth.Custom.Value)
+                        {
+                            if (adjustMod is not null)
+                            {
+                                //if (adjustMod.UseBPM.Value)
+                                //{
+                                //    if (beatmap.BeatmapInfo.BPM == Beatmap.BeatmapInfo.BPM)
+                                //    {
+                                //        SR = StarRatingRebirth.CalculateStarRating(hit, starRatingRebirth.OD.Value, keys, adjustMod.SpeedChange.Value);
+                                //    }
+                                //    else
+                                //    {
+                                //        SR = originalValue;
+                                //    }
+                                //}
+                                //else
+                                {
+                                    SR = StarRatingRebirth.CalculateStarRating(hit, starRatingRebirth.OD.Value, keys, adjustMod.SpeedChange.Value);
+                                }
+                            }
+                            else
+                            {
+                                SR = StarRatingRebirth.CalculateStarRating(hit, starRatingRebirth.OD.Value, keys, clockRate);
+                            }
+                        }
+                        else
+                        {
+                            SR = StarRatingRebirth.CalculateStarRating(hit, od, keys, clockRate);
+                        }
+                    }
+                    else
+                    {
+                        SR = skills.OfType<Strain>().Single().DifficultyValue() * difficulty_multiplier;
+                    }
+                }
+                catch
+                {
+                    try
+                    {
+                        SR = skills.OfType<Strain>().Single().DifficultyValue() * difficulty_multiplier;
+                    }
+                    catch
+                    {
+                        SR = 0;
+                    }
+                }
+
+                DateTime afterCal = DateTime.Now;
+                // Logger.Log(beatmap.Metadata.Title + " \n" + beatmap.BeatmapInfo.DifficultyName + "\n Elapsed Time: " + (afterCal - beforeCal).ToString(), level: LogLevel.Important);
+            }
+            return SR;
         }
 
         private static int maxComboForObject(HitObject hitObject)
@@ -64,10 +218,13 @@ namespace osu.Game.Rulesets.Mania.Difficulty
 
         protected override IEnumerable<DifficultyHitObject> CreateDifficultyHitObjects(IBeatmap beatmap, double clockRate)
         {
-            var sortedObjects = beatmap.HitObjects.ToArray();
-            int totalColumns = ((ManiaBeatmap)beatmap).TotalColumns;
+            ManiaBeatmap maniaBeatmap = (ManiaBeatmap)beatmap;
+            int totalColumns = maniaBeatmap.TotalColumns;
+            maniaBeatmap.HitObjects.ForEach(obj => obj.Column = Math.Clamp(obj.Column, 0, totalColumns - 1));
 
-            LegacySortHelper<HitObject>.Sort(sortedObjects, Comparer<HitObject>.Create((a, b) => (int)Math.Round(a.StartTime) - (int)Math.Round(b.StartTime)));
+            var sortedObjects = maniaBeatmap.HitObjects.ToArray();
+
+            LegacySortHelper<ManiaHitObject>.Sort(sortedObjects, Comparer<ManiaHitObject>.Create((a, b) => (int)Math.Round(a.StartTime) - (int)Math.Round(b.StartTime)));
 
             List<DifficultyHitObject> objects = new List<DifficultyHitObject>();
             List<DifficultyHitObject>[] perColumnObjects = new List<DifficultyHitObject>[totalColumns];

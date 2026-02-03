@@ -4,10 +4,13 @@
 #nullable disable
 
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using System.Threading;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Textures;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Screens;
@@ -24,6 +27,7 @@ namespace osu.Game.Screens.Backgrounds
 {
     public partial class BackgroundScreenDefault : BackgroundScreen
     {
+        private bool storageTextureSourceAdded;
         private Background background;
 
         private int currentDisplay;
@@ -33,6 +37,9 @@ namespace osu.Game.Screens.Backgrounds
         private Bindable<BackgroundSource> source;
         private Bindable<IntroSequence> introSequence;
         private readonly SeasonalBackgroundLoader seasonalBackgroundLoader = new SeasonalBackgroundLoader();
+
+        private ScheduledDelegate autoNext;
+        private bool isVideo = false;
 
         [Resolved]
         private IBindable<WorkingBeatmap> beatmap { get; set; }
@@ -66,6 +73,13 @@ namespace osu.Game.Screens.Backgrounds
 
             currentDisplay = RNG.Next(0, background_count);
             Next();
+
+            autoNext = Scheduler.AddDelayed(() =>
+            {
+                if (isVideo)
+                    return;
+                Next();
+            }, 4000, true); // every 5 seconds
 
             // helper function required for AddOnce usage.
             void next() => Next();
@@ -138,8 +152,125 @@ namespace osu.Game.Screens.Backgrounds
             currentDisplay++;
         }
 
+        [Resolved]
+        private Storage storage { get; set; } = null!;
+
+        [Resolved]
+        private TextureStore textures { get; set; } = null!;
+
+        [Resolved]
+        private LargeTextureStore largeTextures { get; set; } = null!;
+
+        private bool tryGetRandomStorageFile(string relativePath, out string resourcePath, out string fullPath, string[] extensions = null)
+        {
+            resourcePath = null;
+            fullPath = null;
+
+            try
+            {
+                string[] files = storage.GetFiles(relativePath, "*").ToArray();
+
+                if (extensions != null && extensions.Length > 0)
+                    files = files.Where(f => extensions.Any(ext => f.EndsWith(ext, System.StringComparison.OrdinalIgnoreCase))).ToArray();
+
+                // ensure directory exists on disk so users can drop files
+                string dataFolderPath = storage.GetFullPath(relativePath);
+
+                if (files.Length == 0)
+                {
+                    if (dataFolderPath != null && !Directory.Exists(dataFolderPath))
+                    {
+                        Directory.CreateDirectory(dataFolderPath);
+                        Logger.Log(dataFolderPath, LoggingTarget.Information, LogLevel.Important);
+                    }
+
+                    // directory exists but no files
+                    if (dataFolderPath != null)
+                        Logger.Log(dataFolderPath, LoggingTarget.Information, LogLevel.Important);
+
+                    return false;
+                }
+
+                // ensure textures can resolve storage-backed resources (only add once)
+                if (!storageTextureSourceAdded)
+                {
+                    try
+                    {
+                        var loader = gameHost.CreateTextureLoaderStore(new Framework.IO.Stores.StorageBackedResourceStore(storage));
+                        textures.AddTextureSource(loader);
+
+                        largeTextures?.AddTextureSource(loader);
+
+                        storageTextureSourceAdded = true;
+                    }
+                    catch
+                    {
+                        // ignore failures; callers will fall back
+                    }
+                }
+
+                string file = files[RNG.Next(files.Length)];
+
+                // Normalize separators for comparison.
+                string normalizedFile = file.Replace('\\', '/');
+                string normalizedRelative = relativePath.Replace('\\', '/').TrimEnd('/');
+
+                if (normalizedFile.StartsWith(normalizedRelative + "/", System.StringComparison.OrdinalIgnoreCase)
+                    || normalizedFile.Equals(normalizedRelative, System.StringComparison.OrdinalIgnoreCase))
+                {
+                    resourcePath = normalizedFile;
+                }
+                else if (Path.IsPathRooted(file))
+                {
+                    resourcePath = normalizedFile;
+                }
+                else
+                {
+                    resourcePath = (normalizedRelative + "/" + normalizedFile.TrimStart('/'));
+                }
+
+                // fullPath: prefer absolute if file contains full path, else resolve via storage
+                if (Path.IsPathRooted(file))
+                    fullPath = file;
+                else
+                    fullPath = storage.GetFullPath(file);
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private Background createBackground()
         {
+            switch (source.Value)
+            {
+                case BackgroundSource.WebmSource:
+                {
+                    string relativePath = Path.Combine("Resources", "Video");
+                    isVideo = true;
+
+                    if (tryGetRandomStorageFile(relativePath, out string resourcePath, out string fullPath, new[] { ".webm", ".mp4", ".flv", ".mkv" }))
+                        return new VideoBackgroundScreen(fullPath ?? resourcePath);
+
+                    Stream videoName = textures.GetStream("Resources/default_video.webm");
+                    return new StreamVideoBackgroundScreen(videoName);
+                }
+
+                case BackgroundSource.Slides:
+                {
+                    string relativePath = Path.Combine("Resources", "Background");
+                    isVideo = false;
+
+                    if (tryGetRandomStorageFile(relativePath, out string resourcePath, out string _, new[] { ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff" }))
+                        return new Background(resourcePath);
+
+                    return new Background($@"Menu/background-{currentDisplay % 6 + 1}");
+                }
+            }
+
             // seasonal background loading gets highest priority.
             Background newBackground = seasonalBackgroundLoader.LoadNextBackground();
 

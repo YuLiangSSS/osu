@@ -17,6 +17,8 @@ namespace osu.Game.Rulesets.Mania.Scoring
     {
         private const double combo_base = 4;
 
+        public (int Perfect, int Great, int Good, int Ok, int Meh, int Miss) HitProportionScore = (305, 300, 200, 100, 50, 0);
+
         public ManiaScoreProcessor()
             : base(new ManiaRuleset())
         {
@@ -42,7 +44,17 @@ namespace osu.Game.Rulesets.Mania.Scoring
             switch (result)
             {
                 case HitResult.Perfect:
-                    return 305;
+                    return HitProportionScore.Perfect;
+                case HitResult.Great:
+                    return HitProportionScore.Great;
+                case HitResult.Good:
+                    return HitProportionScore.Good;
+                case HitResult.Ok:
+                    return HitProportionScore.Ok;
+                case HitResult.Meh:
+                    return HitProportionScore.Meh;
+                case HitResult.Miss:
+                    return HitProportionScore.Miss;
             }
 
             return base.GetBaseScoreForResult(result);
