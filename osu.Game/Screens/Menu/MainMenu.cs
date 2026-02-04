@@ -282,9 +282,6 @@ namespace osu.Game.Screens.Menu
             logo.FadeColour(Color4.White, 100, Easing.OutQuint);
             logo.FadeIn(100, Easing.OutQuint);
 
-            // For seeking background.
-            logo.FadeOut(100, Easing.OutQuint);
-
             logoProxy = logo.ProxyToContainer(logoTarget);
 
             if (resuming)

@@ -17,7 +17,7 @@ namespace osu.Game.Graphics.Containers
 {
     public partial class ParallaxContainer : Container, IRequireHighFrequencyMousePosition
     {
-        public const float DEFAULT_PARALLAX_AMOUNT = 0.50f; // 0.02f
+        public const float DEFAULT_PARALLAX_AMOUNT = 0.02f;
 
         /// <summary>
         /// The amount of parallax movement. Negative values will reverse the direction of parallax relative to user input.
