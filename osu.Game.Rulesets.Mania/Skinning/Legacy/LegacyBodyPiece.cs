@@ -154,11 +154,25 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
                     lightAnimation.GotoFrame(0);
 
                 lightContainer.FadeIn(80);
+
+                if (ManiaModLNColor.IsActivated)
+                {
+                    holdNote.Head.FadeColour(new Colour4(ManiaModLNColor.R, ManiaModLNColor.G, ManiaModLNColor.B, ManiaModLNColor.A), ManiaModLNColor.FadeDur);
+                    holdNote.FadeColour(new Colour4(ManiaModLNColor.R, ManiaModLNColor.G, ManiaModLNColor.B, ManiaModLNColor.A), ManiaModLNColor.FadeDur);
+                    bodySprite?.FadeColour(new Colour4(ManiaModLNColor.R, ManiaModLNColor.G, ManiaModLNColor.B, ManiaModLNColor.A), ManiaModLNColor.FadeDur);
+                }
             }
             else
             {
                 lightContainer.FadeOut(120)
                               .OnComplete(d => Column.TopLevelContainer.Remove(d, false));
+
+                if (ManiaModLNColor.IsActivated)
+                {
+                    holdNote.Head.FadeColour(Colour4.White, ManiaModLNColor.FadeDur);
+                    holdNote.FadeColour(Colour4.White, ManiaModLNColor.FadeDur);
+                    bodySprite?.FadeColour(Colour4.White, ManiaModLNColor.FadeDur);
+                }
             }
         }
 

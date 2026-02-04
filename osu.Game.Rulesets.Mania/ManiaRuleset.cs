@@ -310,12 +310,13 @@ namespace osu.Game.Rulesets.Mania
                 case ModType.Fun:
                     return new Mod[]
                     {
-                        new ManiaModO2Judgement(),
-                        new ManiaModO2Health(),
-                        new ManiaModNiceBPM(),
-                        new ManiaModGracer(),
                         new ManiaModAccuracyAdaptive(),
                         new ManiaModHealthAdaptive(),
+                        new ManiaModO2Judgement(),
+                        new ManiaModO2Health(),
+                        new ManiaModLNColor(),
+                        new ManiaModNiceBPM(),
+                        new ManiaModGracer(),
                         new ManiaModNewJudgement(),
                         new ManiaModJudgmentsAdjust(),
                         new ManiaModRemedy(),
