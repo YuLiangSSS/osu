@@ -100,6 +100,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 {
                     yield return ("Duration Limit", $"{DurationLimit.Value}s");
                 }
+                yield return ("Line Spacing", $"{LineSpacing.Value}");
+                if (InvertLineSpacing.Value)
+                {
+                    yield return ("Invert Line Spacing", "On");
+                }
                 yield return ("Seed", $"{(Seed.Value == null ? "Null" : Seed.Value)}");
             }
         }
